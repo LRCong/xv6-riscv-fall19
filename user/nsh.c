@@ -16,11 +16,6 @@ int getcmd(char *buf, int nbuf)
 
 void setargs(char *cmd, char *argv[], int *argc)
 {
-    // for (int i = 0; i < 10; i++)
-    // {
-    //     argv[i] = args[i];
-    // }
-    // fprintf(2, cmd);
     int i, j;
     for (i = 0, j = 0; cmd[j] != '\n' && cmd[j] != '\0'; j++)
     {
