@@ -36,7 +36,7 @@ struct
 
   // Linked list of all buffers, through prev/next.
   // head.next is most recently used.
-  struct buf hashbucket[NBUCKETS];
+  struct buf head[NBUCKETS];
 } bcache;
 
 void binit(void)
@@ -48,18 +48,18 @@ void binit(void)
     initlock(&bcache.lock[i], "bcache");
 
     // Create linked list of buffers
-    b = &bcache.hashbucket[i];
+    b = &bcache.head[i];
     b->prev = b;
     b->next = b;
   }
 
   for (b = bcache.buf; b < bcache.buf + NBUF; b++)
   {
-    b->next = bcache.hashbucket[0].next;
-    b->prev = &bcache.hashbucket[0];
+    b->next = bcache.head[0].next;
+    b->prev = &bcache.head[0];
     initsleeplock(&b->lock, "buffer");
-    bcache.hashbucket[0].next->prev = b;
-    bcache.hashbucket[0].next = b;
+    bcache.head[0].next->prev = b;
+    bcache.head[0].next = b;
   }
 }
 
@@ -74,7 +74,7 @@ bget(uint dev, uint blockno)
   acquire(&bcache.lock[h]);
 
   // Is the block already cached?
-  for (b = bcache.hashbucket[h].next; b != &bcache.hashbucket[h]; b = b->next)
+  for (b = bcache.head[h].next; b != &bcache.head[h]; b = b->next)
   {
     if (b->dev == dev && b->blockno == blockno)
     {
@@ -91,7 +91,7 @@ bget(uint dev, uint blockno)
   {
     acquire(&bcache.lock[nh]);
     // Not cached; recycle an unused buffer.
-    for (b = bcache.hashbucket[nh].prev; b != &bcache.hashbucket[nh]; b = b->prev)
+    for (b = bcache.head[nh].prev; b != &bcache.head[nh]; b = b->prev)
     {
       if (b->refcnt == 0)
       {
@@ -104,10 +104,10 @@ bget(uint dev, uint blockno)
         b->prev->next = b->next;
         release(&bcache.lock[nh]);
 
-        b->next = bcache.hashbucket[h].next;
-        b->prev = &bcache.hashbucket[h];
-        bcache.hashbucket[h].next = b;
-        bcache.hashbucket[h].next->prev = b;
+        b->next = bcache.head[h].next;
+        b->prev = &bcache.head[h];
+        bcache.head[h].next->prev = b;
+        bcache.head[h].next = b;
 
         release(&bcache.lock[h]);
         acquiresleep(&b->lock);
@@ -162,10 +162,10 @@ void brelse(struct buf *b)
     // no one is waiting for it.
     b->next->prev = b->prev;
     b->prev->next = b->next;
-    b->next = bcache.hashbucket[h].next;
-    b->prev = &bcache.hashbucket[h];
-    bcache.hashbucket[h].next->prev = b;
-    bcache.hashbucket[h].next = b;
+    b->next = bcache.head[h].next;
+    b->prev = &bcache.head[h];
+    bcache.head[h].next->prev = b;
+    bcache.head[h].next = b;
   }
 
   release(&bcache.lock[h]);
